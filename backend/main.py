@@ -1,18 +1,45 @@
-from fastapi import FastAPI
-from backend.face_engine import compare_faces
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, UploadFile, File
 import os
+import shutil
+import uuid
 
+from backend.face_engine import compare_faces
+
+# ✅ THIS LINE WAS MISSING OR MISPLACED
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # allow all frontend origins (dev only)
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+UPLOAD_DIR = "temp"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @app.get("/")
 def home():
     return {"status": "Face Trace AI backend running"}
 
-@app.get("/compare")
-def compare():
-    img1 = os.path.join(BASE_DIR, "dataset", "known", "person1.jpg")
-    img2 = os.path.join(BASE_DIR, "dataset", "test", "unknown.jpg")
+@app.post("/compare")
+def compare(
+    known: UploadFile = File(...),
+    unknown: UploadFile = File(...)
+):
+    known_path = os.path.join(UPLOAD_DIR, f"known_{uuid.uuid4()}.jpg")
+    unknown_path = os.path.join(UPLOAD_DIR, f"unknown_{uuid.uuid4()}.jpg")
 
-    return compare_faces(img1, img2)
+    with open(known_path, "wb") as f:
+        shutil.copyfileobj(known.file, f)
+
+    with open(unknown_path, "wb") as f:
+        shutil.copyfileobj(unknown.file, f)
+
+    result = compare_faces(known_path, unknown_path)
+
+    os.remove(known_path)
+    os.remove(unknown_path)
+
+    return result
