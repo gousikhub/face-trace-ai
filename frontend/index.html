@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Face Trace AI</title>
+
+<style>
+:root {
+    --cyan: #00ffff;
+    --blue: #0077ff;
+    --red: #ff4b4b;
+    --green: #00ff88;
+}
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", sans-serif;
+    background:
+        radial-gradient(circle at top, #0f2027, #000),
+        repeating-linear-gradient(
+            90deg,
+            rgba(0,255,255,0.04) 0px,
+            rgba(0,255,255,0.04) 1px,
+            transparent 1px,
+            transparent 28px
+        );
+    color: #e0e0e0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.app {
+    width: 440px;
+    padding: 28px;
+    border-radius: 18px;
+    background: rgba(10, 20, 30, 0.95);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 0 35px rgba(0,255,255,0.25);
+    border: 1px solid rgba(0,255,255,0.3);
+}
+
+h1 {
+    text-align: center;
+    color: var(--cyan);
+    letter-spacing: 3px;
+    margin-bottom: 4px;
+}
+
+.subtitle {
+    text-align: center;
+    font-size: 12px;
+    color: #aaa;
+    margin-bottom: 22px;
+}
+
+.section {
+    margin-bottom: 16px;
+}
+
+label {
+    font-size: 11px;
+    color: var(--cyan);
+    letter-spacing: 1px;
+}
+
+input[type="file"] {
+    width: 100%;
+    margin-top: 6px;
+    padding: 10px;
+    background: #000;
+    color: #ccc;
+    border-radius: 8px;
+    border: 1px solid rgba(0,255,255,0.4);
+}
+
+.preview {
+    margin-top: 8px;
+    height: 100px;
+    border-radius: 10px;
+    border: 1px dashed rgba(0,255,255,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    overflow: hidden;
+}
+
+.preview img {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+button {
+    width: 100%;
+    margin-top: 14px;
+    padding: 14px;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(90deg, var(--cyan), var(--blue));
+    color: #000;
+    font-weight: bold;
+    letter-spacing: 1px;
+    cursor: pointer;
+}
+
+.scan-bar {
+    margin-top: 18px;
+    height: 6px;
+    width: 100%;
+    background: #000;
+    border-radius: 6px;
+    overflow: hidden;
+    display: none;
+}
+
+.scan-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--cyan), var(--blue));
+    animation: scan 2s linear infinite;
+}
+
+@keyframes scan {
+    from { width: 0%; }
+    to { width: 100%; }
+}
+
+.status {
+    margin-top: 12px;
+    font-size: 12px;
+    color: #aaa;
+    text-align: center;
+    display: none;
+}
+
+.result {
+    margin-top: 18px;
+    padding: 16px;
+    border-radius: 12px;
+    display: none;
+    text-align: center;
+}
+
+.success {
+    border: 1px solid var(--green);
+    background: rgba(0,255,136,0.15);
+    color: var(--green);
+}
+
+.failure {
+    border: 1px solid var(--red);
+    background: rgba(255,75,75,0.15);
+    color: var(--red);
+}
+
+.percent {
+    font-size: 28px;
+    margin-top: 8px;
+    font-weight: bold;
+}
+
+.distance {
+    font-size: 12px;
+    color: #ccc;
+    margin-top: 4px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+    <h1>FACE TRACE AI</h1>
+    <div class="subtitle">Advanced Facial Similarity Analysis</div>
+
+    <div class="section">
+        <label>KNOWN FACE</label>
+        <input type="file" id="known" accept="image/*" onchange="preview(this,'p1')">
+        <div class="preview" id="p1">NO IMAGE</div>
+    </div>
+
+    <div class="section">
+        <label>UNKNOWN FACE</label>
+        <input type="file" id="unknown" accept="image/*" onchange="preview(this,'p2')">
+        <div class="preview" id="p2">NO IMAGE</div>
+    </div>
+
+    <button onclick="analyze()">INITIATE AI ANALYSIS</button>
+
+    <div class="scan-bar" id="scanBar">
+        <div class="scan-fill"></div>
+    </div>
+
+    <div class="status" id="statusText"></div>
+
+    <div class="result" id="resultBox">
+        <div id="resultText"></div>
+        <div class="percent" id="percentText"></div>
+        <div class="distance" id="distanceText"></div>
+    </div>
+</div>
+
+<script>
+/* 🔊 SOUND ENGINE */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function tone(f, d) {
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.frequency.value = f;
+    g.gain.value = 0.07;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    setTimeout(()=>o.stop(), d);
+}
+const scanSound = () => tone(800,120);
+const successSound = () => tone(1200,200);
+const failSound = () => tone(300,300);
+
+/* IMAGE PREVIEW */
+function preview(input, id) {
+    const box = document.getElementById(id);
+    box.innerHTML = "";
+    if (input.files[0]) {
+        const img = document.createElement("img");
+        img.src = URL.createObjectURL(input.files[0]);
+        box.appendChild(img);
+    }
+}
+
+/* MAIN ANALYSIS */
+async function analyze() {
+    const known = document.getElementById("known").files[0];
+    const unknown = document.getElementById("unknown").files[0];
+    if (!known || !unknown) {
+        alert("Upload both images");
+        failSound();
+        return;
+    }
+
+    const scanBar = document.getElementById("scanBar");
+    const status = document.getElementById("statusText");
+    const resultBox = document.getElementById("resultBox");
+
+    scanBar.style.display = "block";
+    status.style.display = "block";
+    resultBox.style.display = "none";
+
+    const steps = [
+        "Detecting facial landmarks...",
+        "Normalizing face vectors...",
+        "Extracting embeddings...",
+        "Comparing similarity matrices..."
+    ];
+
+    let i = 0;
+    const interval = setInterval(()=>{
+        status.innerText = steps[i % steps.length];
+        scanSound();
+        i++;
+    }, 600);
+
+    const formData = new FormData();
+    formData.append("known", known);
+    formData.append("unknown", unknown);
+
+    try {
+        const res = await fetch("http://127.0.0.1:8000/compare", {
+            method: "POST",
+            body: formData
+        });
+        const data = await res.json();
+
+        clearInterval(interval);
+        scanBar.style.display = "none";
+        status.style.display = "none";
+
+        resultBox.style.display = "block";
+
+        const similarity = Math.max(0, Math.min(100, Math.round((1 - data.distance) * 100)));
+
+        if (data.verified) {
+            resultBox.className = "result success";
+            document.getElementById("resultText").innerText = "MATCH CONFIRMED";
+            successSound();
+        } else {
+            resultBox.className = "result failure";
+            document.getElementById("resultText").innerText = "MATCH FAILED";
+            failSound();
+        }
+
+        document.getElementById("percentText").innerText = similarity + "% Similarity";
+        document.getElementById("distanceText").innerText = "Distance: " + data.distance;
+
+    } catch (e) {
+        clearInterval(interval);
+        status.innerText = "Backend Error";
+        failSound();
+    }
+}
+</script>
+
+</body>
+</html>
