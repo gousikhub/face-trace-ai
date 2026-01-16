@@ -1,16 +1,28 @@
 from deepface import DeepFace
 
-def compare_faces(known_path: str, unknown_path: str):
-    result = DeepFace.verify(
-        img1_path=known_path,
-        img2_path=unknown_path,
-        model_name="VGG-Face",
-        enforce_detection=True
-    )
+def compare_faces(img1_path, img2_path):
+    try:
+        result = DeepFace.verify(
+            img1_path=img1_path,
+            img2_path=img2_path,
+            enforce_detection=True
+        )
 
-    return {
-        "verified": result["verified"],
-        "distance": result["distance"],
-        "threshold": result["threshold"],
-        "status": "success"
-    }
+        return {
+            "verified": result["verified"],
+            "distance": round(result["distance"], 4),
+            "threshold": result["threshold"],
+            "status": "success"
+        }
+
+    except Exception:
+        # Handles:
+        # - No face detected
+        # - Multiple faces
+        # - Blurry / invalid images
+        return {
+            "verified": False,
+            "distance": None,
+            "threshold": None,
+            "status": "face_not_detected"
+        }
