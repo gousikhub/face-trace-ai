@@ -208,3 +208,7 @@ __marimo__/
 
 # Face Trace AI project
 dataset/
+# Runtime uploaded files
+temp/
+temp_*.jpg
+temp_*.jpeg
